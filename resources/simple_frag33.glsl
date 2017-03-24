@@ -17,6 +17,8 @@ void main()
  * color.y = color.y + (1.0 - color.y) * distance(point, gl_FragCoord) / 1500;
  * color.z = color.z + (1.0 - color.z) * distance(point, gl_FragCoord) / 1500;
  * if(distance(point, gl_FragCoord) < 20)
- */   discard;
-   color = vec3(1, 0, 0);
+ *    discard;
+ */  color = vec3(pos.z, 0, 1 - pos.z);
+   if(pos.z > 1)
+      discard;
 }

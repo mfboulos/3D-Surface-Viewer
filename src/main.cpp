@@ -27,7 +27,7 @@ using namespace glm;
 
 // various global parameters
 int pixW, pixH;
-int res;
+float res;
 float xMin;
 float xMax;
 float yMin;
@@ -37,6 +37,10 @@ float zMax;
 int mousePress;
 float varX;
 float varY;
+float pitch;
+float yaw;
+float scaleVar;
+float *scrollVal = NULL;
 std::string expr_string;
 
 // type definitions for readability
@@ -48,7 +52,8 @@ symbol_table_t symbol_table;
 expression_t expression;
 parser_t parser;
 
-static const float e_const = 2.7182818284590452353602874713526624977; // constant e
+static const float e_const  = 2.7182818284590452353602874713526624977; // constant e
+static const float pi_const = 3.1415926535897932384626433832795028841; // constant pi
 
 GLFWwindow *window; // Main application window
 string RESOURCE_DIR = ""; // Where the resources are loaded from
@@ -75,6 +80,16 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
 {
    if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
       glfwSetWindowShouldClose(window, GL_TRUE);
+   } else if(key == GLFW_KEY_S && action == GLFW_PRESS) {
+      if(scrollVal == &scaleVar)
+         scrollVal = NULL;
+      else
+         scrollVal = &scaleVar;
+   } else if(key == GLFW_KEY_Q && action == GLFW_PRESS) {
+      if(scrollVal == &res)
+         scrollVal = NULL;
+      else
+         scrollVal = &res;
    }
 }
 
@@ -123,6 +138,19 @@ static void mouse_callback(GLFWwindow *window, int button, int action, int mods)
    }
 }
 
+static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
+{
+   if(scrollVal != NULL)
+   {
+      if(*scrollVal + yoffset/3 < 2)
+         *scrollVal = 2;
+      else if(*scrollVal + yoffset/3 > 100)
+         *scrollVal = 100;
+      else
+         *scrollVal += yoffset/3;
+   }
+}
+
 //if the window is resized, capture the new size and reset the viewport
 static void resize_callback(GLFWwindow *window, int in_width, int in_height) {
    //get the window size - may be different then pixels for retina	
@@ -153,12 +181,13 @@ static void init()
    //Set various params
    mousePress = 0;
    res = 10;
-   xMin = -1;
-   xMax = 1;
-   yMin = -1;
-   yMax = 1;
-   zMin = -1;
-   zMax = 1;
+   xMin = -10;
+   xMax = 10;
+   yMin = -10;
+   yMax = 10;
+   zMin = -10;
+   zMax = 10;
+   scaleVar = 15;
 
    // Set background color.
    glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
@@ -213,33 +242,33 @@ static void inputPoint(int *index, expression_t expression)
  //  glBindBuffer(GL_ARRAY_BUFFER, 0);
    g_vertex_buffer_data[(*index)++] = varX;
    g_vertex_buffer_data[(*index)++] = varY;
-   g_vertex_buffer_data[(*index)++] = 0;//expression.value();
+   g_vertex_buffer_data[(*index)++] = expression.value();
 }
 
 static void inputPoints(int *index, expression_t expression, int i, int j)
 {
-   varX = i * (xMax - xMin) / res + xMin;
-   varY = j * (yMax - yMin) / res + yMin;
+   varX = i * (xMax - xMin) / floor(res) + xMin;
+   varY = j * (yMax - yMin) / floor(res) + yMin;
    inputPoint(index, expression);
 
-   varX = (i + 1) * (xMax - xMin) / res + xMin;
+   varX = (i + 1) * (xMax - xMin) / floor(res) + xMin;
    inputPoint(index, expression);
 
-   varY = (j + 1) * (yMax - yMin) / res + yMin;
+   varY = (j + 1) * (yMax - yMin) / floor(res) + yMin;
    inputPoint(index, expression);
 
    inputPoint(index, expression);
 
-   varX = i * (xMax - xMin) / res + xMin;
+   varX = i * (xMax - xMin) / floor(res) + xMin;
    inputPoint(index, expression);
 
-   varY = j * (yMax - yMin) / res + yMin;
+   varY = j * (yMax - yMin) / floor(res) + yMin;
    inputPoint(index, expression);
 }
 
 static void resizeVals()
 {
-   for(int i = 0; i < 6*res*res; i++)
+   for(int i = 0; i < 6 * floor(res) * floor(res); i++)
    {
       g_vertex_buffer_data[3*i] -= xMin;
       g_vertex_buffer_data[3*i] /= ((xMax - xMin) / 2);
@@ -294,7 +323,23 @@ static void render()
 //   }
 //   resizeVals(g_vertex_buffer_data, zMin, zMax);
    // Draw the triangle using GLSL.
+   MV->scale(vec3(scaleVar/15, scaleVar/15, scaleVar/15));
+   MV->rotate(-pi_const/3, vec3(1, 0, 0));
+   MV->rotate(pi_const/3, vec3(0, 0, 1));
+   MV->translate(vec3(.34, .2, -1.2));
    prog->bind();
+
+   int index = 0;
+   for(int i = 0; i < res; i++)
+   {
+      for(int j = 0; j < res; j++)
+      {
+         inputPoints(&index, expression, i, j);
+      }
+   }
+   resizeVals();
+   glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+   glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), (const GLvoid*) g_vertex_buffer_data, GL_DYNAMIC_DRAW);
 
    //send the matrices to the shaders
    glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
@@ -314,7 +359,8 @@ static void render()
        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
      */
    //actually draw from vertex 0, 3 vertices
-   glDrawArrays(GL_TRIANGLES, 0, 6*res*res);
+   for(int i = 0; i < 2 * floor(res) * floor(res); i++)
+      glDrawArrays(GL_TRIANGLES, 3*i, 3);
    glDisableVertexAttribArray(0);
 
    prog->unbind();
@@ -377,6 +423,8 @@ int main(int argc, char **argv)
    glfwSetCursorPosCallback(window, cursor_callback);
    //set the window resize call back
    glfwSetFramebufferSizeCallback(window, resize_callback);
+   //set the scroll callback
+   glfwSetScrollCallback(window, scroll_callback);
 
    /* This is the code that will likely change program to program as you
       may need to initialize or set up different data and state */
