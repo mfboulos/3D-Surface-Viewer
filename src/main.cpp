@@ -27,6 +27,7 @@ using namespace glm;
 
 // various global parameters
 int pixW, pixH;
+int mousePress;
 float res;
 float xMin;
 float xMax;
@@ -34,12 +35,17 @@ float yMin;
 float yMax;
 float zMin;
 float zMax;
-int mousePress;
 float varX;
 float varY;
-float pitch;
-float yaw;
+float xROT;
+float yROT;
+float xRotBASE;
+float yRotBASE;
 float scaleVar;
+float xBASE;
+float yBASE;
+float panX;
+float panY;
 float *scrollVal = NULL;
 std::string expr_string;
 
@@ -57,12 +63,13 @@ static const float pi_const = 3.1415926535897932384626433832795028841; // consta
 
 GLFWwindow *window; // Main application window
 string RESOURCE_DIR = ""; // Where the resources are loaded from
-shared_ptr<Program> prog; //our shader program
+shared_ptr<Program> prog; //our shader program for the surface
+shared_ptr<Program> prog2; //our shader program for the axes
 
 /* Global data associated with triangle geometry - this will likely vary
    in later programs - so is left explicit for now  */
 GLuint VertexArrayID;
-static GLfloat g_vertex_buffer_data[180000] = {0.0f};
+static GLfloat g_vertex_buffer_data[180045] = {0.0f};
 
 //data necessary to give our triangle data to OGL
 GLuint vertexbuffer; 
@@ -74,6 +81,12 @@ static void resizeVals();
 static void error_callback(int error, const char *description)
 {
    cerr << description << endl;
+}
+
+void printFunctionDetails()
+{
+   cout << "\nFunction: " << expr_string << "\nResolution: " << (int)floor(res);
+   cout << "\nDomain: [" << xMin << ", " << xMax << "] x [" << yMin << ", " << yMax << "]\n\n";
 }
 
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
@@ -90,6 +103,45 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
          scrollVal = NULL;
       else
          scrollVal = &res;
+   } else if(key == GLFW_KEY_X && action == GLFW_PRESS) {
+      if(scrollVal == &xMin)
+         scrollVal = &xMax;
+      else if(scrollVal == &xMax)
+         scrollVal = NULL;
+      else
+         scrollVal = &xMin;
+   } else if(key == GLFW_KEY_Y && action == GLFW_PRESS) {
+      if(scrollVal == &yMin)
+         scrollVal = &yMax;
+      else if(scrollVal == &yMax)
+         scrollVal = NULL;
+      else
+         scrollVal = &yMin;
+   } else if(key == GLFW_KEY_UP) {
+      if(action == GLFW_PRESS)
+         panY -= 0.15;
+      else if(action == GLFW_REPEAT)
+         panY -= 0.05;
+   } else if(key == GLFW_KEY_DOWN) {
+      if(action == GLFW_PRESS)
+         panY += 0.15; 
+      else if(action == GLFW_REPEAT)
+         panY += 0.05;
+   } else if(key == GLFW_KEY_RIGHT) {
+      if(action == GLFW_PRESS)
+         panX += 0.15; 
+      else if(action == GLFW_REPEAT)
+         panX += 0.05;
+   } else if(key == GLFW_KEY_LEFT) {
+      if(action == GLFW_PRESS)
+         panX -= 0.15; 
+      else if(action == GLFW_REPEAT)
+         panX -= 0.05;
+   } else if(key == GLFW_KEY_F && action == GLFW_PRESS) {
+      cout << "Enter the new function: ";
+      std::getline(std::cin, expr_string);
+      parser.compile(expr_string, expression);
+      printFunctionDetails();
    }
 }
 
@@ -98,7 +150,11 @@ void MouseButton(int button, int action)
    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
       mousePress = true;
    else if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_RELEASE)
+   {
       mousePress = false;
+      xRotBASE = xROT;
+      yRotBASE = yROT;
+   }
 }
 //callback for cursorPos
 
@@ -108,11 +164,13 @@ static void cursor_callback(GLFWwindow *window, double posX, double posY)
    if(mousePress)
    {
       glfwGetCursorPos(window, &posX, &posY);
-      newPt[0] = (4 * posX - 2 * pixW) / pixH;
+/*      newPt[0] = (4 * posX - 2 * pixW) / pixH;
       newPt[1] = -(4 * posY - 2 * pixH) / pixH;
       glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
       glBufferSubData(GL_ARRAY_BUFFER, sizeof(float)*6, sizeof(float)*2, newPt);
-      glBindBuffer(GL_ARRAY_BUFFER, 0);
+      glBindBuffer(GL_ARRAY_BUFFER, 0); */
+      xROT = xRotBASE + pi_const / 2 * (((4 * posX - 2 * pixW) / pixH) - xBASE);
+      yROT = yRotBASE + pi_const / 3 * ((-(4 * posY - 2 * pixH) / pixH) - yBASE);
    }
 }
 
@@ -121,11 +179,11 @@ static void cursor_callback(GLFWwindow *window, double posX, double posY)
 static void mouse_callback(GLFWwindow *window, int button, int action, int mods)
 {
    double posX, posY;
-   float newPt[2];
+//   float newPt[2];
    MouseButton(button, action);
    if (mousePress) {
       glfwGetCursorPos(window, &posX, &posY);	
-      cout << "Pos X " << posX <<  " Pos Y " << posY << endl;
+/*      cout << "Pos X " << posX <<  " Pos Y " << posY << endl;
       //change this to be the points converted to WORLD
       //THIS IS BROKEN< YOU GET TO FIX IT - yay!
       newPt[0] = (4 * posX - 2 * pixW) / pixH;
@@ -134,7 +192,9 @@ static void mouse_callback(GLFWwindow *window, int button, int action, int mods)
       glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
       //update the vertex array with the updated points
       glBufferSubData(GL_ARRAY_BUFFER, sizeof(float)*6, sizeof(float)*2, newPt);
-      glBindBuffer(GL_ARRAY_BUFFER, 0);
+      glBindBuffer(GL_ARRAY_BUFFER, 0); */
+      xBASE = (4 * posX - 2 * pixW) / pixH;
+      yBASE = -(4 * posY - 2 * pixH) / pixH;
    }
 }
 
@@ -173,6 +233,53 @@ static void initGeom() {
    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), (const GLvoid*) g_vertex_buffer_data, GL_DYNAMIC_DRAW);
 }
 
+void fillBuffer()
+{
+   zMin = FLT_MAX;
+   zMax = FLT_MIN;
+   int index = 0;
+   for(int i = 0; i < floor(res); i++)
+   {
+      for(int j = 0; j < floor(res); j++)
+      {
+         inputPoints(&index, expression, i, j);
+      }
+   }
+
+   // Endpoints of axes
+   g_vertex_buffer_data[180001] = yMin;
+   g_vertex_buffer_data[180004] = yMax;
+
+   g_vertex_buffer_data[180006] = xMin;
+   g_vertex_buffer_data[180009] = xMax;
+
+   g_vertex_buffer_data[180014] = zMin;
+   g_vertex_buffer_data[180017] = zMax;
+
+   // Arrows to represent positive direction
+   g_vertex_buffer_data[180019] = yMax;
+   g_vertex_buffer_data[180021] = -(xMax - xMin) / 40;
+   g_vertex_buffer_data[180022] = .95 * yMax + .05 * yMin;
+   g_vertex_buffer_data[180024] = (xMax - xMin) / 40;
+   g_vertex_buffer_data[180025] = .95 * yMax + .05 * yMin;
+
+   g_vertex_buffer_data[180027] = xMax;
+   g_vertex_buffer_data[180030] = .95 * xMax + .05 * xMin;
+   g_vertex_buffer_data[180031] = -(yMax - yMin) / 40;
+   g_vertex_buffer_data[180033] = .95 * xMax + .05 * xMin;
+   g_vertex_buffer_data[180034] = (yMax - yMin) / 40;
+
+   g_vertex_buffer_data[180038] = zMax;
+   g_vertex_buffer_data[180039] = -(xMax - xMin) / 60;
+   g_vertex_buffer_data[180040] = (yMax - yMin) / 60;
+   g_vertex_buffer_data[180041] = .95 * zMax + .05 * zMin;
+   g_vertex_buffer_data[180042] = (xMax - xMin) / 60;
+   g_vertex_buffer_data[180043] = -(yMax - yMin) / 60;
+   g_vertex_buffer_data[180044] = .95 * zMax + .05 * zMin;
+
+   resizeVals();
+}
+
 //General OGL initialization - set OGL state here
 static void init()
 {
@@ -180,13 +287,19 @@ static void init()
 
    //Set various params
    mousePress = 0;
+   xBASE = 0;
+   yBASE = 0;
+   xROT = 0;
+   yROT = 0;
+   xRotBASE = 0;
+   yRotBASE = 0;
    res = 10;
    xMin = -10;
    xMax = 10;
    yMin = -10;
    yMax = 10;
-   zMin = -10;
-   zMax = 10;
+   panX = 0;
+   panY = 0;
    scaleVar = 15;
 
    // Set background color.
@@ -194,7 +307,7 @@ static void init()
    // Enable z-buffer test.
    glEnable(GL_DEPTH_TEST);
 
-   // Initialize the GLSL program.
+   // Initialize the GLSL programs.
    prog = make_shared<Program>();
    prog->setVerbose(true);
    prog->setShaderNames(RESOURCE_DIR + "simple_vert33.glsl", RESOURCE_DIR + "simple_frag33.glsl");
@@ -202,6 +315,14 @@ static void init()
    prog->addUniform("P");
    prog->addUniform("MV");
    prog->addAttribute("vertPos");
+
+   prog2 = make_shared<Program>();
+   prog2->setVerbose(true);
+   prog2->setShaderNames(RESOURCE_DIR + "simple_vert33.glsl", RESOURCE_DIR + "axis_frag.glsl");
+   prog2->init();
+   prog2->addUniform("P");
+   prog2->addUniform("MV");
+   prog2->addAttribute("vertPos");
 
    // Initialize the functional expression
    varX = 0;
@@ -218,15 +339,19 @@ static void init()
 
    parser.compile(expr_string, expression);
 
-   int index = 0;
-   for(int i = 0; i < res; i++)
+   printFunctionDetails();
+/*   int index = 0;
+   for(int i = 0; i < floor(res); i++)
    {
-      for(int j = 0; j < res; j++)
+      for(int j = 0; j < floor(res); j++)
       {
          inputPoints(&index, expression, i, j);
       }
    }
    resizeVals();
+   g_vertex_buffer_data[180000] = -1 - (2 * xMin / (xMax - xMin));
+*/
+   fillBuffer();
 }
 
 static void inputPoint(int *index, expression_t expression)
@@ -243,6 +368,10 @@ static void inputPoint(int *index, expression_t expression)
    g_vertex_buffer_data[(*index)++] = varX;
    g_vertex_buffer_data[(*index)++] = varY;
    g_vertex_buffer_data[(*index)++] = expression.value();
+   if(expression.value() > zMax)
+      zMax = expression.value();
+   if(expression.value() < zMin)
+      zMin = expression.value();
 }
 
 static void inputPoints(int *index, expression_t expression, int i, int j)
@@ -281,6 +410,20 @@ static void resizeVals()
       g_vertex_buffer_data[3*i + 2] -= zMin;
       g_vertex_buffer_data[3*i + 2] /= ((zMax - zMin) / 2);
       g_vertex_buffer_data[3*i + 2] -= 1;
+   }
+   for(int i = 0; i < 15; i++)
+   {
+      g_vertex_buffer_data[180000 + 3*i] -= xMin;
+      g_vertex_buffer_data[180000 + 3*i] /= ((xMax - xMin) / 2); 
+      g_vertex_buffer_data[180000 + 3*i] -= 1;
+
+      g_vertex_buffer_data[180000 + 3*i + 1] -= yMin;
+      g_vertex_buffer_data[180000 + 3*i + 1] /= ((yMax - yMin) / 2); 
+      g_vertex_buffer_data[180000 + 3*i + 1] -= 1;
+
+      g_vertex_buffer_data[180000 + 3*i + 2] -= zMin;
+      g_vertex_buffer_data[180000 + 3*i + 2] /= ((zMax - zMin) / 2); 
+      g_vertex_buffer_data[180000 + 3*i + 2] -= 1;
    }
 }
 
@@ -324,43 +467,54 @@ static void render()
 //   resizeVals(g_vertex_buffer_data, zMin, zMax);
    // Draw the triangle using GLSL.
    MV->scale(vec3(scaleVar/15, scaleVar/15, scaleVar/15));
+   MV->translate(vec3(panX, panY, 0));
+   MV->rotate(-yROT, vec3(1, 0, 0));
    MV->rotate(-pi_const/3, vec3(1, 0, 0));
    MV->rotate(pi_const/3, vec3(0, 0, 1));
    MV->translate(vec3(.34, .2, -1.2));
-   prog->bind();
+   MV->rotate(xROT, vec3(0, 0, 1));
 
-   int index = 0;
-   for(int i = 0; i < res; i++)
-   {
-      for(int j = 0; j < res; j++)
-      {
-         inputPoints(&index, expression, i, j);
-      }
-   }
-   resizeVals();
+
+   fillBuffer();
    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), (const GLvoid*) g_vertex_buffer_data, GL_DYNAMIC_DRAW);
 
+   prog2->bind();
    //send the matrices to the shaders
    glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
    glUniformMatrix4fv(prog->getUniform("MV"), 1, GL_FALSE, value_ptr(MV->topMatrix()));
-   //we need to set up the vertex array w/colors
+   //set up vertex array
+   glEnableVertexAttribArray(0);
+   glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
+   glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
+
+   //draw the axes and grid
+   for(int i = 0; i < 2 * floor(res) * floor(res); i++)
+   {
+      glDrawArrays(GL_LINES, 3*i, 2);
+      glDrawArrays(GL_LINES, 3*i + 1, 2);
+   }
+   glDrawArrays(GL_LINES, 60000, 6); 
+   glDrawArrays(GL_TRIANGLES, 60006, 9);
+
+   glDisableVertexAttribArray(0);
+
+   prog2->unbind();
+
+   prog->bind();
+   //send the matrices to the shaders
+   glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
+   glUniformMatrix4fv(prog->getUniform("MV"), 1, GL_FALSE, value_ptr(MV->topMatrix()));
+   //we need to set up the vertex array
    glEnableVertexAttribArray(0);
    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
    //key function to get up how many elements to pull out at a time (3)
    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
-   /*
-       glGenBuffers(1, &colorbuffer);
-       glBindBuffer(GL_ARRAY_BUFFER, colorbuffer);
-       glBufferData(GL_ARRAY_BUFFER, sizeof(g_color_buffer_data), g_color_buffer_data, GL_STATIC_DRAW);
 
-       glEnableVertexAttribArray(1);
-       glBindBuffer(GL_ARRAY_BUFFER, colorbuffer);
-       glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
-     */
-   //actually draw from vertex 0, 3 vertices
+   //draw the graph
    for(int i = 0; i < 2 * floor(res) * floor(res); i++)
       glDrawArrays(GL_TRIANGLES, 3*i, 3);
+
    glDisableVertexAttribArray(0);
 
    prog->unbind();
