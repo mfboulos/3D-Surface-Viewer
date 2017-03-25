@@ -104,12 +104,21 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
       else
          scrollVal = &res;
    } else if(key == GLFW_KEY_X && action == GLFW_PRESS) {
-      if(scrollVal == &xMin)
-         scrollVal = &xMax;
-      else if(scrollVal == &xMax)
-         scrollVal = NULL;
+      std::string temp;
+      cout << "\nEnter the new minimum X value for the domain: ";
+      std::getline(std::cin, temp);
+      float temp1 = std::stof(temp, NULL);
+      cout << "\nEnter the new maximum X value for the domain: ";
+      std::getline(std::cin, temp);
+      float temp2 = std::stof(temp, NULL);
+      if(temp1 < temp2)
+      {
+         xMin = temp1;
+         xMax = temp2;
+      }
       else
-         scrollVal = &xMin;
+         cout << "\nError with bounds, requires xMin < xMax\n";
+      printFunctionDetails();
    } else if(key == GLFW_KEY_Y && action == GLFW_PRESS) {
       if(scrollVal == &yMin)
          scrollVal = &yMax;
@@ -121,22 +130,22 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
       if(action == GLFW_PRESS)
          panY -= 0.15;
       else if(action == GLFW_REPEAT)
-         panY -= 0.05;
+         panY -= 0.07;
    } else if(key == GLFW_KEY_DOWN) {
       if(action == GLFW_PRESS)
          panY += 0.15; 
       else if(action == GLFW_REPEAT)
-         panY += 0.05;
+         panY += 0.07;
    } else if(key == GLFW_KEY_RIGHT) {
-      if(action == GLFW_PRESS)
-         panX += 0.15; 
-      else if(action == GLFW_REPEAT)
-         panX += 0.05;
-   } else if(key == GLFW_KEY_LEFT) {
       if(action == GLFW_PRESS)
          panX -= 0.15; 
       else if(action == GLFW_REPEAT)
-         panX -= 0.05;
+         panX -= 0.07;
+   } else if(key == GLFW_KEY_LEFT) {
+      if(action == GLFW_PRESS)
+         panX += 0.15; 
+      else if(action == GLFW_REPEAT)
+         panX += 0.07;
    } else if(key == GLFW_KEY_F && action == GLFW_PRESS) {
       cout << "Enter the new function: ";
       std::getline(std::cin, expr_string);
@@ -160,15 +169,9 @@ void MouseButton(int button, int action)
 
 static void cursor_callback(GLFWwindow *window, double posX, double posY)
 {
-   float newPt[2];
    if(mousePress)
    {
       glfwGetCursorPos(window, &posX, &posY);
-/*      newPt[0] = (4 * posX - 2 * pixW) / pixH;
-      newPt[1] = -(4 * posY - 2 * pixH) / pixH;
-      glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-      glBufferSubData(GL_ARRAY_BUFFER, sizeof(float)*6, sizeof(float)*2, newPt);
-      glBindBuffer(GL_ARRAY_BUFFER, 0); */
       xROT = xRotBASE + pi_const / 2 * (((4 * posX - 2 * pixW) / pixH) - xBASE);
       yROT = yRotBASE + pi_const / 3 * ((-(4 * posY - 2 * pixH) / pixH) - yBASE);
    }
@@ -179,20 +182,9 @@ static void cursor_callback(GLFWwindow *window, double posX, double posY)
 static void mouse_callback(GLFWwindow *window, int button, int action, int mods)
 {
    double posX, posY;
-//   float newPt[2];
    MouseButton(button, action);
    if (mousePress) {
       glfwGetCursorPos(window, &posX, &posY);	
-/*      cout << "Pos X " << posX <<  " Pos Y " << posY << endl;
-      //change this to be the points converted to WORLD
-      //THIS IS BROKEN< YOU GET TO FIX IT - yay!
-      newPt[0] = (4 * posX - 2 * pixW) / pixH;
-      newPt[1] = -(4 * posY - 2 * pixH) / pixH;
-      cout << "converted:" << newPt[0] << " " << newPt[1] << endl;
-      glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-      //update the vertex array with the updated points
-      glBufferSubData(GL_ARRAY_BUFFER, sizeof(float)*6, sizeof(float)*2, newPt);
-      glBindBuffer(GL_ARRAY_BUFFER, 0); */
       xBASE = (4 * posX - 2 * pixW) / pixH;
       yBASE = -(4 * posY - 2 * pixH) / pixH;
    }
@@ -202,12 +194,14 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
 {
    if(scrollVal != NULL)
    {
-      if(*scrollVal + yoffset/3 < 2)
-         *scrollVal = 2;
-      else if(*scrollVal + yoffset/3 > 100)
-         *scrollVal = 100;
-      else
-         *scrollVal += yoffset/3;
+      if(scrollVal == &res || scrollVal == &scaleVar) {
+         if(*scrollVal + yoffset/3 < 2)
+            *scrollVal = 2;
+         else if(*scrollVal + yoffset/3 > 100)
+            *scrollVal = 100;
+         else
+            *scrollVal += yoffset/3;
+      }
    }
 }
 
@@ -278,6 +272,7 @@ void fillBuffer()
    g_vertex_buffer_data[180044] = .95 * zMax + .05 * zMin;
 
    resizeVals();
+printf("%f, %f, %f\n", g_vertex_buffer_data[180018], g_vertex_buffer_data[180021], g_vertex_buffer_data[180024]);
 }
 
 //General OGL initialization - set OGL state here
@@ -340,31 +335,11 @@ static void init()
    parser.compile(expr_string, expression);
 
    printFunctionDetails();
-/*   int index = 0;
-   for(int i = 0; i < floor(res); i++)
-   {
-      for(int j = 0; j < floor(res); j++)
-      {
-         inputPoints(&index, expression, i, j);
-      }
-   }
-   resizeVals();
-   g_vertex_buffer_data[180000] = -1 - (2 * xMin / (xMax - xMin));
-*/
    fillBuffer();
 }
 
 static void inputPoint(int *index, expression_t expression)
 {
-//   float newPt[3] = {0, 0, 0};
-//   newPt[0] = (varX - xMin) / (xMax - xMin) * 2 - 1;
-//   newPt[1] = (varY - yMin) / (yMax - yMin) * 2 - 1;
-//   newPt[2] = (0 - zMin) / (zMax - zMin) * 2 - 1;//expression.value();
-
-//   glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-   //update the vertex array with the updated points
-//   glBufferSubData(GL_ARRAY_BUFFER, *index * sizeof(float)*3, sizeof(float)*3, newPt);
- //  glBindBuffer(GL_ARRAY_BUFFER, 0);
    g_vertex_buffer_data[(*index)++] = varX;
    g_vertex_buffer_data[(*index)++] = varY;
    g_vertex_buffer_data[(*index)++] = expression.value();
@@ -455,17 +430,7 @@ static void render()
    }
    MV->pushMatrix();
 
-   // Fill the vertex array with points on the surface
-//   int index = 0;
-//   for(int i = 0; i < res; i++)
-//   {
-//      for(int j = 0; j < res; j++)
-//      {
-//         inputPoints(&index, expression, i, j);
-//      }
-//   }
-//   resizeVals(g_vertex_buffer_data, zMin, zMax);
-   // Draw the triangle using GLSL.
+   // Change model view based on params.
    MV->scale(vec3(scaleVar/15, scaleVar/15, scaleVar/15));
    MV->translate(vec3(panX, panY, 0));
    MV->rotate(-yROT, vec3(1, 0, 0));
@@ -474,12 +439,13 @@ static void render()
    MV->translate(vec3(.34, .2, -1.2));
    MV->rotate(xROT, vec3(0, 0, 1));
 
-
+   // Update the buffer
    fillBuffer();
    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), (const GLvoid*) g_vertex_buffer_data, GL_DYNAMIC_DRAW);
 
    prog2->bind();
+
    //send the matrices to the shaders
    glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
    glUniformMatrix4fv(prog->getUniform("MV"), 1, GL_FALSE, value_ptr(MV->topMatrix()));
@@ -494,8 +460,21 @@ static void render()
       glDrawArrays(GL_LINES, 3*i, 2);
       glDrawArrays(GL_LINES, 3*i + 1, 2);
    }
-   glDrawArrays(GL_LINES, 60000, 6); 
-   glDrawArrays(GL_TRIANGLES, 60006, 9);
+   if(xMin <= 10 && xMax >= -10 && zMin <= 10 && zMax >= -10)
+   {
+      glDrawArrays(GL_LINES, 60000, 2);
+      glDrawArrays(GL_TRIANGLES, 60006, 3);
+   }
+   if(yMin <= 10 && yMax >= -10 && zMin <= 10 && zMax >= -10)
+   {
+      glDrawArrays(GL_LINES, 60002, 2);
+      glDrawArrays(GL_TRIANGLES, 60009, 3);
+   }
+   if(xMin <= 10 && xMax >= -10 && yMin <= 10 && yMax >= -10)
+   {
+      glDrawArrays(GL_LINES, 60004, 2);
+      glDrawArrays(GL_TRIANGLES, 60012, 3);
+   }
 
    glDisableVertexAttribArray(0);
 
