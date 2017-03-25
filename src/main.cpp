@@ -8,6 +8,8 @@ https://github.com/nshkurkin/glee
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
+// Open source function parsing code
+// Found at URL: http://www.partow.net/programming/exprtk/index.html
 #include "exprtk.hpp"
 
 #include "GLSL.h"
@@ -54,6 +56,7 @@ typedef exprtk::symbol_table<float> symbol_table_t;
 typedef exprtk::expression<float>     expression_t;
 typedef exprtk::parser<float>             parser_t;
 
+// global variables for function parsing
 symbol_table_t symbol_table;
 expression_t expression;
 parser_t parser;
@@ -86,23 +89,35 @@ static void error_callback(int error, const char *description)
 void printFunctionDetails()
 {
    cout << "\nFunction: " << expr_string << "\nResolution: " << (int)floor(res);
-   cout << "\nDomain: [" << xMin << ", " << xMax << "] x [" << yMin << ", " << yMax << "]\n\n";
+   cout << "\nDomain: [" << xMin << ", " << xMax << "] x [" << yMin << ", " << yMax << "]";
+   cout << "\nScroll: "; 
+   if(scrollVal == &scaleVar)
+      cout << "Scale\n";
+   else if(scrollVal == &res)
+      cout << "Resolution\n";
+   else if(scrollVal == NULL)
+      cout << "None\n";
 }
 
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
    if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
+   {
+      cout << "\nSee you next time!\n\n";
       glfwSetWindowShouldClose(window, GL_TRUE);
+   }
    } else if(key == GLFW_KEY_S && action == GLFW_PRESS) {
       if(scrollVal == &scaleVar)
          scrollVal = NULL;
       else
          scrollVal = &scaleVar;
+      printFunctionDetails();
    } else if(key == GLFW_KEY_Q && action == GLFW_PRESS) {
       if(scrollVal == &res)
          scrollVal = NULL;
       else
          scrollVal = &res;
+      printFunctionDetails();
    } else if(key == GLFW_KEY_X && action == GLFW_PRESS) {
       std::string temp;
       cout << "\nEnter the new minimum X value for the domain: ";
@@ -120,12 +135,21 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
          cout << "\nError with bounds, requires xMin < xMax\n";
       printFunctionDetails();
    } else if(key == GLFW_KEY_Y && action == GLFW_PRESS) {
-      if(scrollVal == &yMin)
-         scrollVal = &yMax;
-      else if(scrollVal == &yMax)
-         scrollVal = NULL;
+      std::string temp;
+      cout << "\nEnter the new minimum Y value for the domain: ";
+      std::getline(std::cin, temp);
+      float temp1 = std::stof(temp, NULL);
+      cout << "\nEnter the new maximum Y value for the domain: ";
+      std::getline(std::cin, temp);
+      float temp2 = std::stof(temp, NULL);
+      if(temp1 < temp2)
+      {   
+         yMin = temp1;
+         yMax = temp2;
+      }   
       else
-         scrollVal = &yMin;
+         cout << "\nError with bounds, requires yMin < yMax\n";
+      printFunctionDetails();
    } else if(key == GLFW_KEY_UP) {
       if(action == GLFW_PRESS)
          panY -= 0.15;
@@ -147,7 +171,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
       else if(action == GLFW_REPEAT)
          panX += 0.07;
    } else if(key == GLFW_KEY_F && action == GLFW_PRESS) {
-      cout << "Enter the new function: ";
+      cout << "\nEnter the new function: ";
       std::getline(std::cin, expr_string);
       parser.compile(expr_string, expression);
       printFunctionDetails();
@@ -241,44 +265,51 @@ void fillBuffer()
    }
 
    // Endpoints of axes
-   g_vertex_buffer_data[180001] = yMin;
-   g_vertex_buffer_data[180004] = yMax;
+   g_vertex_buffer_data[180001] = fmin(0, fmin(yMin, -yMax));
+   g_vertex_buffer_data[180004] = fmax(0, fmax(-yMin, yMax));
 
-   g_vertex_buffer_data[180006] = xMin;
-   g_vertex_buffer_data[180009] = xMax;
+   g_vertex_buffer_data[180006] = fmin(0, fmin(xMin, -xMax));
+   g_vertex_buffer_data[180009] = fmax(0, fmax(-xMin, xMax));
 
-   g_vertex_buffer_data[180014] = zMin;
-   g_vertex_buffer_data[180017] = zMax;
+   g_vertex_buffer_data[180014] = fmin(0, fmin(zMin, -zMax));
+   g_vertex_buffer_data[180017] = fmax(0, fmax(-zMin, zMax));
 
    // Arrows to represent positive direction
-   g_vertex_buffer_data[180019] = yMax;
-   g_vertex_buffer_data[180021] = -(xMax - xMin) / 40;
-   g_vertex_buffer_data[180022] = .95 * yMax + .05 * yMin;
-   g_vertex_buffer_data[180024] = (xMax - xMin) / 40;
-   g_vertex_buffer_data[180025] = .95 * yMax + .05 * yMin;
-
-   g_vertex_buffer_data[180027] = xMax;
-   g_vertex_buffer_data[180030] = .95 * xMax + .05 * xMin;
-   g_vertex_buffer_data[180031] = -(yMax - yMin) / 40;
-   g_vertex_buffer_data[180033] = .95 * xMax + .05 * xMin;
-   g_vertex_buffer_data[180034] = (yMax - yMin) / 40;
-
-   g_vertex_buffer_data[180038] = zMax;
-   g_vertex_buffer_data[180039] = -(xMax - xMin) / 60;
-   g_vertex_buffer_data[180040] = (yMax - yMin) / 60;
-   g_vertex_buffer_data[180041] = .95 * zMax + .05 * zMin;
-   g_vertex_buffer_data[180042] = (xMax - xMin) / 60;
-   g_vertex_buffer_data[180043] = -(yMax - yMin) / 60;
-   g_vertex_buffer_data[180044] = .95 * zMax + .05 * zMin;
+   g_vertex_buffer_data[180019] = g_vertex_buffer_data[180004];
+   g_vertex_buffer_data[180027] = g_vertex_buffer_data[180009];
+   g_vertex_buffer_data[180038] = g_vertex_buffer_data[180017];
 
    resizeVals();
-printf("%f, %f, %f\n", g_vertex_buffer_data[180018], g_vertex_buffer_data[180021], g_vertex_buffer_data[180024]);
+
+   g_vertex_buffer_data[180021] = g_vertex_buffer_data[180018] - 1/20.0;
+   g_vertex_buffer_data[180022] = g_vertex_buffer_data[180019] - 1/10.0;
+   g_vertex_buffer_data[180024] = g_vertex_buffer_data[180018] + 1/20.0;
+   g_vertex_buffer_data[180025] = g_vertex_buffer_data[180019] - 1/10.0;
+   g_vertex_buffer_data[180030] = g_vertex_buffer_data[180027] - 1/10.0;
+   g_vertex_buffer_data[180031] = g_vertex_buffer_data[180028] - 1/20.0;
+   g_vertex_buffer_data[180033] = g_vertex_buffer_data[180027] - 1/10.0;
+   g_vertex_buffer_data[180034] = g_vertex_buffer_data[180028] + 1/20.0;
+   g_vertex_buffer_data[180039] = g_vertex_buffer_data[180036] - 1/30.0;
+   g_vertex_buffer_data[180040] = g_vertex_buffer_data[180037] + 1/30.0;
+   g_vertex_buffer_data[180041] = g_vertex_buffer_data[180038] - 1/15.0;
+   g_vertex_buffer_data[180042] = g_vertex_buffer_data[180036] + 1/30.0;
+   g_vertex_buffer_data[180043] = g_vertex_buffer_data[180037] - 1/30.0;
+   g_vertex_buffer_data[180044] = g_vertex_buffer_data[180038] - 1/15.0;
 }
 
 //General OGL initialization - set OGL state here
 static void init()
 {
    GLSL::checkVersion();
+   cout << "\n**** OpenGL 3D Surface Viewer ****\nMade by Michael Boulos\n";
+   cout << "\nControls:\n";
+   cout << " * Mouse click/drag - Rotate model view\n";
+   cout << " * Arrow keys - Pan model view\n";
+   cout << " * [s] - Set mouse scroll to scale (default)\n";
+   cout << " * [q] - Set mouse scroll to resolution\n\n";
+   cout << " * [f] - Define new function in terminal\n";
+   cout << " * [x] - Set X parameters in terminal\n";
+   cout << " * [y] - Set Y parameters in terminal\n";
 
    //Set various params
    mousePress = 0;
@@ -296,6 +327,7 @@ static void init()
    panX = 0;
    panY = 0;
    scaleVar = 15;
+   scrollVal = &scaleVar;
 
    // Set background color.
    glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
@@ -343,10 +375,13 @@ static void inputPoint(int *index, expression_t expression)
    g_vertex_buffer_data[(*index)++] = varX;
    g_vertex_buffer_data[(*index)++] = varY;
    g_vertex_buffer_data[(*index)++] = expression.value();
-   if(expression.value() > zMax)
-      zMax = expression.value();
-   if(expression.value() < zMin)
-      zMin = expression.value();
+   if(expression.value() != std::numeric_limits<float>::infinity() && expression.value() != -(std::numeric_limits<float>::infinity()))
+   {
+      if(expression.value() > zMax)
+         zMax = expression.value();
+      if(expression.value() < zMin)
+         zMin = expression.value();
+   }
 }
 
 static void inputPoints(int *index, expression_t expression, int i, int j)
@@ -460,17 +495,22 @@ static void render()
       glDrawArrays(GL_LINES, 3*i, 2);
       glDrawArrays(GL_LINES, 3*i + 1, 2);
    }
-   if(xMin <= 10 && xMax >= -10 && zMin <= 10 && zMax >= -10)
+
+   float X = (xMax - xMin) / 5;
+   float Y = (yMax - yMin) / 5;
+   float Z = (zMax - zMin) / 5;
+
+   if(xMin <= X && xMax >= -X && zMin <= Z && zMax >= -Z)
    {
       glDrawArrays(GL_LINES, 60000, 2);
       glDrawArrays(GL_TRIANGLES, 60006, 3);
    }
-   if(yMin <= 10 && yMax >= -10 && zMin <= 10 && zMax >= -10)
+   if(yMin <= Y && yMax >= -Y && zMin <= Z && zMax >= -Z)
    {
       glDrawArrays(GL_LINES, 60002, 2);
       glDrawArrays(GL_TRIANGLES, 60009, 3);
    }
-   if(xMin <= 10 && xMax >= -10 && yMin <= 10 && yMax >= -10)
+   if(xMin <= X && xMax >= -X && yMin <= Y && yMax >= -Y)
    {
       glDrawArrays(GL_LINES, 60004, 2);
       glDrawArrays(GL_TRIANGLES, 60012, 3);
