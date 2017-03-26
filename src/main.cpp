@@ -86,6 +86,9 @@ static void error_callback(int error, const char *description)
    cerr << description << endl;
 }
 
+/*
+ * Prints function details for the surface displayed
+ */
 void printFunctionDetails()
 {
    cout << "\nFunction: " << expr_string << "\nResolution: " << (int)floor(res);
@@ -178,6 +181,7 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
    }
 }
 
+//helper function, toggles a switch to handle view rotation
 void MouseButton(int button, int action)
 {
    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS)
@@ -189,8 +193,8 @@ void MouseButton(int button, int action)
       yRotBASE = yROT;
    }
 }
-//callback for cursorPos
 
+//callback for cursorPos
 static void cursor_callback(GLFWwindow *window, double posX, double posY)
 {
    if(mousePress)
@@ -201,8 +205,7 @@ static void cursor_callback(GLFWwindow *window, double posX, double posY)
    }
 }
 
-//callback for the mouse when clicked move the triangle when helper functions
-//written
+//callback for the mouse when clicked start rotating camera view
 static void mouse_callback(GLFWwindow *window, int button, int action, int mods)
 {
    double posX, posY;
@@ -214,6 +217,7 @@ static void mouse_callback(GLFWwindow *window, int button, int action, int mods)
    }
 }
 
+//callback for scroll functionality
 static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
 {
    if(scrollVal != NULL)
@@ -251,6 +255,11 @@ static void initGeom() {
    glBufferData(GL_ARRAY_BUFFER, sizeof(g_vertex_buffer_data), (const GLvoid*) g_vertex_buffer_data, GL_DYNAMIC_DRAW);
 }
 
+/*
+ * Main function for buffer updating
+ * Fills buffer data with triangles that construct the surface
+ * Adds data for the axes at the end of the buffer
+ */
 void fillBuffer()
 {
    zMin = FLT_MAX;
@@ -300,6 +309,7 @@ void fillBuffer()
 //General OGL initialization - set OGL state here
 static void init()
 {
+   // Print initial information for OpenGL, surface plotter, etc.
    GLSL::checkVersion();
    cout << "\n**** OpenGL 3D Surface Viewer ****\nMade by Michael Boulos\n";
    cout << "\nControls:\n";
@@ -311,7 +321,7 @@ static void init()
    cout << " * [x] - Set X parameters in terminal\n";
    cout << " * [y] - Set Y parameters in terminal\n";
 
-   //Set various params
+   // Set various params
    mousePress = 0;
    xBASE = 0;
    yBASE = 0;
@@ -331,6 +341,7 @@ static void init()
 
    // Set background color.
    glClearColor(1.0f, 1.0f, 1.0f, 0.0f);
+
    // Enable z-buffer test.
    glEnable(GL_DEPTH_TEST);
 
@@ -366,10 +377,14 @@ static void init()
 
    parser.compile(expr_string, expression);
 
+   // Initial print of function details
    printFunctionDetails();
-   fillBuffer();
 }
 
+/*
+ * Function that updates a single point in the buffer array
+ * Updates zMin and zMax based on resulting values
+ */
 static void inputPoint(int *index, expression_t expression)
 {
    g_vertex_buffer_data[(*index)++] = varX;
@@ -384,6 +399,8 @@ static void inputPoint(int *index, expression_t expression)
    }
 }
 
+
+// Calls inputPoint to input triangle data into the buffer array
 static void inputPoints(int *index, expression_t expression, int i, int j)
 {
    varX = i * (xMax - xMin) / floor(res) + xMin;
@@ -405,6 +422,7 @@ static void inputPoints(int *index, expression_t expression, int i, int j)
    inputPoint(index, expression);
 }
 
+// Resizes the values in the buffer array based on the mins and maxes of each dimension
 static void resizeVals()
 {
    for(int i = 0; i < 6 * floor(res) * floor(res); i++)
@@ -456,6 +474,7 @@ static void render()
    // Create the matrix stacks - please leave these alone for now
    auto P = make_shared<MatrixStack>();
    auto MV = make_shared<MatrixStack>();
+
    // Apply orthographic projection.
    P->pushMatrix();
    if (width > height) {
@@ -481,25 +500,28 @@ static void render()
 
    prog2->bind();
 
-   //send the matrices to the shaders
+   // Send the matrices to the shaders
    glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
    glUniformMatrix4fv(prog->getUniform("MV"), 1, GL_FALSE, value_ptr(MV->topMatrix()));
-   //set up vertex array
+
+   // Set up vertex array
    glEnableVertexAttribArray(0);
    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
 
-   //draw the axes and grid
+   // Draw the axes and grid
    for(int i = 0; i < 2 * floor(res) * floor(res); i++)
    {
       glDrawArrays(GL_LINES, 3*i, 2);
       glDrawArrays(GL_LINES, 3*i + 1, 2);
    }
 
+   // Set max distance from axes such that they are displayed
    float X = (xMax - xMin) / 5;
    float Y = (yMax - yMin) / 5;
    float Z = (zMax - zMin) / 5;
 
+   // Draw axes
    if(xMin <= X && xMax >= -X && zMin <= Z && zMax >= -Z)
    {
       glDrawArrays(GL_LINES, 60000, 2);
@@ -521,16 +543,17 @@ static void render()
    prog2->unbind();
 
    prog->bind();
-   //send the matrices to the shaders
+
+   // Send the matrices to the shaders
    glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
    glUniformMatrix4fv(prog->getUniform("MV"), 1, GL_FALSE, value_ptr(MV->topMatrix()));
-   //we need to set up the vertex array
+
+   // Set up the vertex array
    glEnableVertexAttribArray(0);
    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
-   //key function to get up how many elements to pull out at a time (3)
    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
 
-   //draw the graph
+   // Draw the surface
    for(int i = 0; i < 2 * floor(res) * floor(res); i++)
       glDrawArrays(GL_TRIANGLES, 3*i, 3);
 
@@ -553,13 +576,14 @@ int main(int argc, char **argv)
 
    /* your main will always include a similar set up to establish your window
       and GL context, etc. */
-
    // Set error callback as openGL will report errors but they need a call back
    glfwSetErrorCallback(error_callback);
+
    // Initialize the library.
    if(!glfwInit()) {
       return -1;
    }
+
    //request the highest possible version of OGL - important for mac
    glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
    glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
@@ -568,6 +592,7 @@ int main(int argc, char **argv)
 
    pixW = 640;
    pixH = 480;
+
    // Create a windowed mode window and its OpenGL context.
    window = glfwCreateWindow(pixW, pixH, "Michael Boulos", NULL, NULL);
    if(!window) {
@@ -576,6 +601,7 @@ int main(int argc, char **argv)
    }
    // Make the window's context current.
    glfwMakeContextCurrent(window);
+
    // Initialize GLEW.
    glewExperimental = true;
    if(glewInit() != GLEW_OK) {
@@ -614,6 +640,7 @@ int main(int argc, char **argv)
       // Poll for and process events.
       glfwPollEvents();
    }
+
    // Quit program.
    glfwDestroyWindow(window);
    glfwTerminate();
