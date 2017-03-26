@@ -30,6 +30,7 @@ using namespace glm;
 // various global parameters
 int pixW, pixH;
 int mousePress;
+int colorMode;
 float res;
 float xMin;
 float xMax;
@@ -37,6 +38,8 @@ float yMin;
 float yMax;
 float zMin;
 float zMax;
+float zLow;
+float zHigh;
 float varX;
 float varY;
 float xROT;
@@ -91,13 +94,20 @@ static void error_callback(int error, const char *description)
  */
 void printFunctionDetails()
 {
-   cout << "\nFunction: " << expr_string << "\nResolution: " << (int)floor(res);
+   cout << "\nFunction: " << expr_string;
+   if(zLow != -1 || zHigh != 1)
+      cout << " from z = " << ((zLow + 1)/2*(zMax - zMin) + zMin) << " to z = " << ((zHigh + 1)/2*(zMax - zMin));
+   cout << "\nResolution: " << (int)floor(res);
    cout << "\nDomain: [" << xMin << ", " << xMax << "] x [" << yMin << ", " << yMax << "]";
    cout << "\nScroll: "; 
    if(scrollVal == &scaleVar)
       cout << "Scale\n";
    else if(scrollVal == &res)
       cout << "Resolution\n";
+   else if(scrollVal == &zLow)
+      cout << "Lower Z\n";
+   else if(scrollVal == &zHigh)
+      cout << "Upper Z\n";
    else if(scrollVal == NULL)
       cout << "None\n";
 }
@@ -105,10 +115,12 @@ void printFunctionDetails()
 static void key_callback(GLFWwindow *window, int key, int scancode, int action, int mods)
 {
    if(key == GLFW_KEY_ESCAPE && action == GLFW_PRESS) {
-   {
       cout << "\nSee you next time!\n\n";
       glfwSetWindowShouldClose(window, GL_TRUE);
-   }
+   } else if(key == GLFW_KEY_C && action == GLFW_PRESS) {
+      colorMode += 1;
+   } else if(key == GLFW_KEY_P && action == GLFW_PRESS) {
+      printFunctionDetails();
    } else if(key == GLFW_KEY_S && action == GLFW_PRESS) {
       if(scrollVal == &scaleVar)
          scrollVal = NULL;
@@ -120,6 +132,18 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
          scrollVal = NULL;
       else
          scrollVal = &res;
+      printFunctionDetails();
+   } else if(key == GLFW_KEY_L && action == GLFW_PRESS) {
+      if(scrollVal == &zLow)
+         scrollVal = NULL;
+      else
+         scrollVal = &zLow;
+      printFunctionDetails();
+   } else if(key == GLFW_KEY_H && action == GLFW_PRESS) {
+      if(scrollVal == &zHigh)
+         scrollVal = NULL;
+      else
+         scrollVal = &zHigh;
       printFunctionDetails();
    } else if(key == GLFW_KEY_X && action == GLFW_PRESS) {
       std::string temp;
@@ -157,26 +181,29 @@ static void key_callback(GLFWwindow *window, int key, int scancode, int action, 
       if(action == GLFW_PRESS)
          panY -= 0.15;
       else if(action == GLFW_REPEAT)
-         panY -= 0.07;
+         panY -= 0.15;
    } else if(key == GLFW_KEY_DOWN) {
       if(action == GLFW_PRESS)
          panY += 0.15; 
       else if(action == GLFW_REPEAT)
-         panY += 0.07;
+         panY += 0.15;
    } else if(key == GLFW_KEY_RIGHT) {
       if(action == GLFW_PRESS)
          panX -= 0.15; 
       else if(action == GLFW_REPEAT)
-         panX -= 0.07;
+         panX -= 0.15;
    } else if(key == GLFW_KEY_LEFT) {
       if(action == GLFW_PRESS)
          panX += 0.15; 
       else if(action == GLFW_REPEAT)
-         panX += 0.07;
+         panX += 0.15;
    } else if(key == GLFW_KEY_F && action == GLFW_PRESS) {
       cout << "\nEnter the new function: ";
       std::getline(std::cin, expr_string);
       parser.compile(expr_string, expression);
+      zLow = -1;
+      zHigh = 1;
+      scrollVal = &scaleVar;
       printFunctionDetails();
    }
 }
@@ -229,6 +256,20 @@ static void scroll_callback(GLFWwindow *window, double xoffset, double yoffset)
             *scrollVal = 100;
          else
             *scrollVal += yoffset/3;
+      } else if(scrollVal == &zLow || scrollVal == &zHigh) {
+         if(zLow > zHigh)
+         {
+            if(scrollVal == &zLow)
+               zLow = zHigh;
+            else
+               zHigh = zLow;
+         }
+         else if(*scrollVal + yoffset/420 < -1)
+            *scrollVal = -1;
+         else if(*scrollVal + yoffset/420 > 1)
+            *scrollVal = 1;
+         else
+            *scrollVal += yoffset/420;
       }
    }
 }
@@ -273,6 +314,12 @@ void fillBuffer()
       }
    }
 
+   if(zMin == zMax)
+   {
+      zMin -= 0.01;
+      zMax += 0.01;
+   }
+      
    // Endpoints of axes
    g_vertex_buffer_data[180001] = fmin(0, fmin(yMin, -yMax));
    g_vertex_buffer_data[180004] = fmax(0, fmax(-yMin, yMax));
@@ -315,14 +362,20 @@ static void init()
    cout << "\nControls:\n";
    cout << " * Mouse click/drag - Rotate model view\n";
    cout << " * Arrow keys - Pan model view\n";
-   cout << " * [s] - Set mouse scroll to scale (default)\n";
-   cout << " * [q] - Set mouse scroll to resolution\n\n";
-   cout << " * [f] - Define new function in terminal\n";
-   cout << " * [x] - Set X parameters in terminal\n";
-   cout << " * [y] - Set Y parameters in terminal\n";
+   cout << " * [C] - Change color mode (mesh, surface, or both)\n";
+   cout << " * [S] - Set mouse scroll to scale (default)\n";
+   cout << " * [Q] - Set mouse scroll to resolution\n";
+   cout << " * [L] - Set mouse scroll to lower z cutoff\n";
+   cout << " * [H] - Set mouse scroll to upper z cutoff\n";
+   cout << " * [F] - Define new function in terminal\n";
+   cout << " * [X] - Set X parameters in terminal\n";
+   cout << " * [Y] - Set Y parameters in terminal\n";
+   cout << " * [P] - Print function details\n";
+   cout << " * [ESC] - Close the display window\n";
 
    // Set various params
    mousePress = 0;
+   colorMode = 0;
    xBASE = 0;
    yBASE = 0;
    xROT = 0;
@@ -334,8 +387,10 @@ static void init()
    xMax = 10;
    yMin = -10;
    yMax = 10;
+   zLow = -1;
+   zHigh = 1;
    panX = 0;
-   panY = 0;
+   panY = 1;
    scaleVar = 15;
    scrollVal = &scaleVar;
 
@@ -352,6 +407,8 @@ static void init()
    prog->init();
    prog->addUniform("P");
    prog->addUniform("MV");
+   prog->addUniform("ZL");
+   prog->addUniform("ZH");
    prog->addAttribute("vertPos");
 
    prog2 = make_shared<Program>();
@@ -360,6 +417,9 @@ static void init()
    prog2->init();
    prog2->addUniform("P");
    prog2->addUniform("MV");
+   prog2->addUniform("ZL");
+   prog2->addUniform("ZH");
+   prog2->addUniform("temp");
    prog2->addAttribute("vertPos");
 
    // Initialize the functional expression
@@ -500,20 +560,29 @@ static void render()
 
    prog2->bind();
 
+   float temp = 0;
    // Send the matrices to the shaders
-   glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
-   glUniformMatrix4fv(prog->getUniform("MV"), 1, GL_FALSE, value_ptr(MV->topMatrix()));
+   glUniformMatrix4fv(prog2->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
+   glUniformMatrix4fv(prog2->getUniform("MV"), 1, GL_FALSE, value_ptr(MV->topMatrix()));
+
+   // Send range restrictions to the shaders
+   glUniform1f(prog2->getUniform("ZL"), zLow);
+   glUniform1f(prog2->getUniform("ZH"), zHigh);
 
    // Set up vertex array
    glEnableVertexAttribArray(0);
    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
 
-   // Draw the axes and grid
-   for(int i = 0; i < 2 * floor(res) * floor(res); i++)
+   // Draw the mesh of the surface
+   if(colorMode%3 == 0 || colorMode%3 == 2)
    {
-      glDrawArrays(GL_LINES, 3*i, 2);
+      glUniform1f(prog2->getUniform("temp"), temp);
+      for(int i = 0; i < 2 * floor(res) * floor(res); i++)
+      {
+         glDrawArrays(GL_LINES, 3*i, 2);
       glDrawArrays(GL_LINES, 3*i + 1, 2);
+      }
    }
 
    // Set max distance from axes such that they are displayed
@@ -522,6 +591,8 @@ static void render()
    float Z = (zMax - zMin) / 5;
 
    // Draw axes
+   temp = 1;
+   glUniform1f(prog2->getUniform("temp"), temp);
    if(xMin <= X && xMax >= -X && zMin <= Z && zMax >= -Z)
    {
       glDrawArrays(GL_LINES, 60000, 2);
@@ -548,14 +619,21 @@ static void render()
    glUniformMatrix4fv(prog->getUniform("P"), 1, GL_FALSE, value_ptr(P->topMatrix()));
    glUniformMatrix4fv(prog->getUniform("MV"), 1, GL_FALSE, value_ptr(MV->topMatrix()));
 
+   // Send range restrictions to shaders
+   glUniform1f(prog->getUniform("ZL"), zLow);
+   glUniform1f(prog->getUniform("ZH"), zHigh);
+
    // Set up the vertex array
    glEnableVertexAttribArray(0);
    glBindBuffer(GL_ARRAY_BUFFER, vertexbuffer);
    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void*) 0);
 
    // Draw the surface
-   for(int i = 0; i < 2 * floor(res) * floor(res); i++)
-      glDrawArrays(GL_TRIANGLES, 3*i, 3);
+   if(colorMode%3 == 0 || colorMode%3 == 1)
+   {
+      for(int i = 0; i < 2 * floor(res) * floor(res); i++)
+         glDrawArrays(GL_TRIANGLES, 3*i, 3);
+   }
 
    glDisableVertexAttribArray(0);
 
@@ -594,7 +672,7 @@ int main(int argc, char **argv)
    pixH = 480;
 
    // Create a windowed mode window and its OpenGL context.
-   window = glfwCreateWindow(pixW, pixH, "Michael Boulos", NULL, NULL);
+   window = glfwCreateWindow(pixW, pixH, "3DPlot", NULL, NULL);
    if(!window) {
       glfwTerminate();
       return -1;
