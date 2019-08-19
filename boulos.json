@@ -1,0 +1,16 @@
+{
+    "name": "OpenGL 3D Surface Viewer",
+    "description": "OpenGL Surface Viewer for two-variable mathematical functions. The motivation is to improve on most available implementations of this idea by offering a more flexible way for users to view the functions they are working with, without having to worry about trivial things like large numbers or division by zero.",
+    "features": [
+        "User-defined function evaluation",
+        "Camera rotation, pan, and zoom",
+        "X and Y bounds",
+        "Render resolution",
+        "Output (Z) bounds",
+        "Graceful handling of infinity and division by zero"
+    ],
+    "stack": [
+        "OpenGL", "C++", "ExprTk"
+    ],
+    "demo": "demo.gif"
+}
